@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using HotelListing.Contracts;
+using HotelListing.Data;
 using HotelListing.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -46,9 +47,8 @@ namespace HotelListing.Controllers
                 return InternalError($"{location}: Error", ex);
             }
         }
-
-        [Authorize]
-        [HttpGet("{id:int}")]
+                
+        [HttpGet("{id:int}", Name = "GetHotel")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetHotel(int id)
@@ -61,6 +61,110 @@ namespace HotelListing.Controllers
                 var result = _mapper.Map<HotelDTO>(hotel);
 
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return InternalError($"{location}: Error", ex);
+            }
+        }
+
+        [Authorize (Roles = "Administrator")]
+        [HttpPost]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> CreateHotel([FromBody] CreateHotelDTO hotelDTO)
+        {
+            var location = GetControllerActionNames();
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogError($"{location}: Invalid POST attempt");
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var hotel = _mapper.Map<Hotel>(hotelDTO);
+                await _unitOfWork.Hotels.Insert(hotel);
+                await _unitOfWork.Save();
+
+                return CreatedAtRoute("GetHotel", new { id = hotel.Id }, hotel);
+            }
+            catch (Exception ex)
+            {
+                return InternalError($"{location}: Error", ex);
+            }
+        }
+
+        [Authorize (Roles = "Administrator")]
+        [HttpPut("{id:int}")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> UpdateHotel(int id, [FromBody] UpdateHotelDTO hotelDTO)
+        {
+            var location = GetControllerActionNames();
+
+            if (!ModelState.IsValid || id < 1)
+            {
+                _logger.LogError($"{location}: Invalid UPDATE attempt");
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var hotel = await _unitOfWork.Hotels.Get(h => h.Id == id);
+
+                if (hotel == null)
+                {
+                    _logger.LogError($"{location}: Invalid UPDATE attempt");
+                    return BadRequest("Hotel not found");
+                }
+
+
+                _mapper.Map(hotelDTO, hotel);
+
+                _unitOfWork.Hotels.Update(hotel);
+                await _unitOfWork.Save();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return InternalError($"{location}: Error", ex);
+            }
+        }
+
+        [Authorize(Roles = "Administrator")]
+        [HttpDelete("{id:int}")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> DeleteHotel(int id)
+        {
+            var location = GetControllerActionNames();
+
+            if (id < 1)
+            {
+                _logger.LogError($"{location}: Invalid DELETE attempt");
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var hotel = await _unitOfWork.Hotels.Get(h => h.Id == id);
+
+                if (hotel == null)
+                {
+                    _logger.LogError($"{location}: Invalid DELETE attempt");
+                    return BadRequest("Hotel not found");
+                }
+
+                await _unitOfWork.Hotels.Delete(id);
+                await _unitOfWork.Save();
+
+                return NoContent();
             }
             catch (Exception ex)
             {

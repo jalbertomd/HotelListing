@@ -87,31 +87,15 @@ namespace HotelListing.Controllers
 
             _logger.LogInformation($"{location}: Login attempt from user {userDTO.Email}");
 
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
             try
             {
                 if (!await _authManager.ValidateUser(userDTO))
                     return Unauthorized("Invalid user name or password");
 
                 return Accepted(new { Token = await _authManager.CreateToken() });
-
-                //var result = await _signInManager.PasswordSignInAsync(userDTO.Email, userDTO.Password, false, false);
-
-                //if (result.Succeeded)
-                //{
-                //    _logger.LogInformation($"{location}: {userDTO.Email} Successfully authenticated");
-
-                //    //var user = await _userManager.FindByNameAsync(userDTO.EmailAddress);
-                //    //var tokenString = await GenerateJsonWebToken(user);
-
-                //    //return Ok(new { token = tokenString });
-                //return Accepted();
-                //}
-                //else
-                //{
-                //    _logger.LogInformation($"{location}: {userDTO.Email} Not authenticated");
-
-                //    return Unauthorized(userDTO);
-                //}
             }
             catch (Exception ex)
             {

@@ -1,6 +1,8 @@
 ﻿using AutoMapper;
 using HotelListing.Contracts;
+using HotelListing.Data;
 using HotelListing.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -46,7 +48,7 @@ namespace HotelListing.Controllers
             }
         }
 
-        [HttpGet("{id:int}")]
+        [HttpGet("{id:int}", Name = "GetCountry")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetCountry(int id)
@@ -59,6 +61,110 @@ namespace HotelListing.Controllers
                 var result = _mapper.Map<CountryDTO>(country);
 
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return InternalError($"{location}: Error", ex);
+            }
+        }
+
+        [Authorize(Roles = "Administrator")]
+        [HttpPost]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> CreateCountry([FromBody] CreateCountryDTO countryDTO)
+        {
+            var location = GetControllerActionNames();
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogError($"{location}: Invalid POST attempt");
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var country = _mapper.Map<Country>(countryDTO);
+                await _unitOfWork.Countries.Insert(country);
+                await _unitOfWork.Save();
+
+                return CreatedAtRoute("GetCountry", new { id = country.Id }, country);
+            }
+            catch (Exception ex)
+            {
+                return InternalError($"{location}: Error", ex);
+            }
+        }
+
+        [Authorize(Roles = "Administrator")]
+        [HttpPut("{id:int}")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> UpdateCountry(int id, [FromBody] UpdateCountryDTO countryDTO)
+        {
+            var location = GetControllerActionNames();
+
+            if (!ModelState.IsValid || id < 1)
+            {
+                _logger.LogError($"{location}: Invalid UPDATE attempt");
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var country = await _unitOfWork.Countries.Get(c => c.Id == id);
+
+                if (country == null)
+                {
+                    _logger.LogError($"{location}: Invalid UPDATE attempt");
+                    return BadRequest("Country not found");
+                }
+
+
+                _mapper.Map(countryDTO, country);
+
+                _unitOfWork.Countries.Update(country);
+                await _unitOfWork.Save();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return InternalError($"{location}: Error", ex);
+            }
+        }
+
+        [Authorize(Roles = "Administrator")]
+        [HttpDelete("{id:int}")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> DeleteCountry(int id)
+        {
+            var location = GetControllerActionNames();
+
+            if (id < 1)
+            {
+                _logger.LogError($"{location}: Invalid DELETE attempt");
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var country = await _unitOfWork.Countries.Get(c => c.Id == id);
+
+                if (country == null)
+                {
+                    _logger.LogError($"{location}: Invalid DELETE attempt");
+                    return BadRequest("Country not found");
+                }
+
+                await _unitOfWork.Countries.Delete(id);
+                await _unitOfWork.Save();
+
+                return NoContent();
             }
             catch (Exception ex)
             {
